@@ -284,11 +284,69 @@ AVAILABLE WAIVER PLAYERS (with real stats):
 ${waiverStr}
 
 RULES:
-- Use the actual stats and games-remaining above for all projections
-- Project week totals as: L14 avg × games remaining this week
-- Only recommend drops if a player is genuinely replaceable (bench filler, injured long-term)
-- Trade ideas must show explicit category rank impact
-- Always search for injury news and role changes — these override stats`;
+- ALWAYS web search for this week's NBA schedule to get accurate games remaining per team
+- Search "[player name] injury news 2026" before any recommendation
+- Project week totals as: L14 avg × actual games remaining this week (from schedule search)
+- Keep all responses SHORT — bullet points, no walls of text
+- Only recommend drops if player is genuinely replaceable
+- Trade ideas must show explicit category rank impact`;
+}
+
+// ── MULTI SCREENSHOT UPLOAD ───────────────────────────────────────────────────
+function MultiScreenshotUpload({label,hint,prompt,value,apiKey,onChange}){
+  const [images,setImages]=useState([]);
+  const [reading,setReading]=useState(false);
+  const [error,setError]=useState("");
+
+  async function handleFiles(files){
+    if(!apiKey){setError("Enter your Anthropic API key first.");return;}
+    setError("");
+    setReading(true);
+    const allNames=[];
+    for(const file of Array.from(files)){
+      if(!file.type.startsWith("image/")) continue;
+      try{
+        const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
+        const compressed=await compressImage(dataUrl,1200);
+        const base64=compressed.split(",")[1];
+        const result=await readImageWithClaude(apiKey,base64,"image/jpeg",prompt);
+        allNames.push(result.trim());
+        setImages(prev=>[...prev,{url:dataUrl,name:file.name}]);
+      }catch(err){setError("Error reading "+file.name+": "+err.message);}
+    }
+    const combined=[value,...allNames].filter(Boolean).join(", ");
+    onChange(combined);
+    setReading(false);
+  }
+
+  return(
+    <div style={{marginBottom:14}}>
+      <label style={{marginBottom:6,display:"block",fontWeight:600,fontSize:13}}>{label}</label>
+      {hint&&<p className="hint" style={{marginTop:0,marginBottom:8}}>{hint}</p>}
+      {images.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:8}}>
+          {images.map((img,i)=>(
+            <div key={i} style={{position:"relative",width:80,height:60,borderRadius:6,overflow:"hidden",border:"1px solid var(--border)"}}>
+              <img src={img.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.7)",fontSize:8,padding:"2px 4px",color:"var(--muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{img.name}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="upload-zone" style={{position:"relative"}}>
+        <input type="file" accept="image/*" multiple onChange={e=>handleFiles(e.target.files)} style={{position:"absolute",inset:0,opacity:0,cursor:"pointer"}}/>
+        <div style={{fontSize:22,marginBottom:6}}>📸</div>
+        {reading
+          ?<div style={{fontSize:12,color:"var(--muted)",display:"flex",alignItems:"center",gap:6}}><span className="spinner" style={{width:11,height:11,borderWidth:2}}/> Reading screenshots...</div>
+          :<div style={{fontSize:12,color:"var(--muted)"}}><strong style={{color:"var(--accent)"}}>Click or drag</strong> · add multiple screenshots</div>
+        }
+        {images.length>0&&!reading&&<div style={{fontSize:11,color:"var(--win)",marginTop:4}}>✅ {images.length} screenshot{images.length>1?"s":""} loaded</div>}
+      </div>
+      {error&&<div style={{fontSize:11,color:"var(--loss)",marginTop:4}}>{error}</div>}
+      <div className="divider"><div className="divider-line"/><span className="divider-text">or type manually</span><div className="divider-line"/></div>
+      <textarea rows={2} placeholder="Paste player names..." value={value} onChange={e=>onChange(e.target.value)}/>
+    </div>
+  );
 }
 
 // ── SCREENSHOT UPLOAD ─────────────────────────────────────────────────────────
@@ -457,10 +515,10 @@ function SetupScreen({onSave}){
           prompt="This is a Yahoo Fantasy Basketball team roster page. List all player names as a simple comma-separated list only. Nothing else."
           value={form.oppRoster} apiKey={form.apiKey} onChange={v=>set("oppRoster",v)}
         />
-        <ScreenshotUpload
+        <MultiScreenshotUpload
           label="➕ Waiver Wire"
-          hint="Screenshot your waiver wire — AI will know who's actually available in YOUR league"
-          prompt="This is a Yahoo Fantasy Basketball waiver wire page. List all available player names in a comma-separated list. Include their team abbreviation if visible. Format: Player Name (TEAM), ..."
+          hint="Upload multiple screenshots to cover your full waiver list"
+          prompt="This is a Yahoo Fantasy Basketball waiver wire page. List all available player names as a comma-separated list only. Include team abbreviation if visible. Format: Player Name (TEAM), ..."
           value={form.waiver} apiKey={form.apiKey} onChange={v=>set("waiver",v)}
         />
       </div>
@@ -482,23 +540,18 @@ function DailyBrief({settings,rosterData,oppData,waiverData,loadingStats}){
     setLoading(true);
     try{
       const sys=buildSystem(settings,rosterData,oppData,waiverData);
-      const text=await callClaude(settings.apiKey,[{role:"user",content:`Generate my daily fantasy brief for today (${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}).
+      const today=new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Daily brief ${today}. Search NBA schedule for games remaining per team this week.
 
-Using the real stats already loaded above, give me:
+FORMAT — short bullets only, no paragraphs:
 
-1. CATEGORY OUTLOOK — For each of the 9 cats, project my week total (L14 avg × games remaining) vs opponent's projected total. Label each WIN 🟢 / LOSE 🔴 / BATTLE 🟡. Show the math.
+📊 CATS: PTS🟢 REB🔴 AST🟡 STL🟢 BLK🟢 3PM🟡 FG%🔴 FT%🟢 TO🟢 → projected score X-X-X
 
-2. WAIVER WIRE ADDS — From the available players listed, recommend top 2-3 adds. For each:
-   - Their games left this week + projected stats
-   - How they flip a battleground category in my favor
-   - Who I should drop to make room (only if that player genuinely has no value)
-   - Clear verdict: ADD ✅ or SKIP ❌
+➕ TOP ADD: [Player] [X games left] — helps [cat]. Drop [player]. One sentence why.
 
-3. MUST-ADD ALERT — Search for any injury news that opens up a new must-add not on my waiver list yet.
+🚨 MUST-ADD: Search injury news. One player or "None."
 
-4. TRADE AWAY — Which 1-2 players from my roster clash with my punt strategy and should be moved?
-
-Be specific. Show the math. Use the actual stats provided.`}],sys);
+🔄 TRADE BAIT: [Player] — clashes with punt because [one line].`}],sys);
       setBrief(text);sv("brief",text);
     }catch(e){setBrief("Error: "+e.message);}
     setLoading(false);
@@ -537,21 +590,24 @@ function MatchupView({settings,rosterData,oppData,loadingStats}){
     setLoading(true);
     try{
       const sys=buildSystem(settings,rosterData,oppData,null);
-      const text=await callClaude(settings.apiKey,[{role:"user",content:`Full matchup analysis for this week.
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Matchup analysis. Search NBA schedule for games remaining per team this week first.
 
-Using the real stats above, project the entire week category-by-category:
+FORMAT — no paragraphs:
 
-For each of the 9 categories:
-- My projected total (L14 avg × my games remaining)
-- Opponent's projected total (L14 avg × their games remaining)
-- Show the math explicitly
-- Verdict: WIN 🟢 / LOSE 🔴 / BATTLE 🟡 (within 5% = battle)
+SCORE: X-X-X
 
-Then:
-- Projected final score (e.g. 6-2-1)
-- Top 3 categories to focus on winning (battlegrounds)
-- Any specific player I should start/bench today to maximize a battleground cat
-- Search for any injury news that could shift projections`}],sys);
+PTS: me X | them X → 🟢/🔴/🟡
+REB: me X | them X → 🟢/🔴/🟡
+AST: me X | them X → 🟢/🔴/🟡
+STL: me X | them X → 🟢/🔴/🟡
+BLK: me X | them X → 🟢/🔴/🟡
+3PM: me X | them X → 🟢/🔴/🟡
+FG%: me X | them X → 🟢/🔴/🟡
+FT%: me X | them X → 🟢/🔴/🟡
+TO: me X | them X → 🟢/🔴/🟡
+
+🎯 FOCUS: [2 cats to target, one line each]
+⚠️ WATCH: [injury/schedule alert, one line]`}],sys);
       setAnalysis(text);sv("matchup",text);
     }catch(e){setAnalysis("Error: "+e.message);}
     setLoading(false);
@@ -610,22 +666,15 @@ function WaiverWire({settings,waiverData,loadingStats,rosterData,oppData}){
     try{
       const allWaiver=[...(waiverData||[]),...extraData];
       const sys=buildSystem(settings,rosterData,oppData,allWaiver.length?allWaiver:null);
-      const text=await callClaude(settings.apiKey,[{role:"user",content:`Waiver wire analysis for my team.
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Waiver rankings for punt: ${settings.punt?.join('+')||'TBD'}. Search NBA schedule for games remaining this week.
 
-Using the real stats loaded above for available waiver players:
+One block per player, ranked best to worst:
 
-For each available player, analyze:
-1. Games left this week + projected week totals (L14 × games)
-2. Fit with my punt strategy (${settings.punt?.join(' + ')||'TBD'})
-3. Which specific battleground category they help me flip vs my opponent
-4. Who I'd need to drop (justified only if that player is genuinely cuttable)
-5. Verdict: ADD ✅ / SKIP ❌ / SITUATIONAL ⚡
+[NAME] [TEAM] — X GL
+Helps: [cats] | Drop: [player or "none"]
+→ ADD ✅ / SKIP ❌ / STASH 📦
 
-Also search for:
-- Any players surging in minutes due to injuries
-- Fantasy analyst buzz on X/Twitter for any of these players
-
-Rank by best fit for MY specific team's needs this week.`}],sys);
+Flag injury surges first with 🚨. No paragraphs.`}],sys);
       setAnalysis(text);
     }catch(e){setAnalysis("Error: "+e.message);}
     setLoading(false);
