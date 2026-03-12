@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fantasy GM — NBA War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#222;--accent:#e8ff47;--accent2:#ff6b35;--text:#f0f0f0;--muted:#666;--win:#4ade80;--loss:#f87171;--battle:#fbbf24}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+    .app{display:flex;height:100vh;overflow:hidden}
+    .sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+    .logo-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--accent);line-height:1}
+    .logo-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-top:4px}
+    .nav{flex:1;padding:16px 0;overflow-y:auto}
+    .nav-btn{width:100%;background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:10px 20px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s;border-left:3px solid transparent}
+    .nav-btn:hover{color:var(--text);background:var(--surface2)}
+    .nav-btn.active{color:var(--accent);border-left-color:var(--accent);background:rgba(232,255,71,.05)}
+    .nav-icon{font-size:16px;width:20px;text-align:center}
+    .sidebar-footer{padding:16px 20px;border-top:1px solid var(--border)}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--win);display:inline-block}
+    .dot.off{background:var(--loss)}
+    .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+    .topbar{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:10}
+    .topbar-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px}
+    .topbar-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+    .content{padding:24px 28px;flex:1}
+    .setup-screen{max-width:580px;margin:32px auto;padding:0 16px}
+    .setup-header{font-family:'Bebas Neue',sans-serif;font-size:44px;letter-spacing:3px;color:var(--accent);line-height:1;margin-bottom:6px}
+    .setup-sub{color:var(--muted);font-size:13px;margin-bottom:28px;line-height:1.6}
+    .setup-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 24px;margin-bottom:14px}
+    .setup-card-title{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+    .setup-card-num{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--border);float:right;line-height:1}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+    input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s;margin-bottom:10px}
+    input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+    input::placeholder,textarea::placeholder{color:var(--muted)}
+    .hint{font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:10px;line-height:1.5}
+    .btn{background:var(--accent);color:#000;border:none;border-radius:6px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;padding:10px 20px;cursor:pointer;transition:all .15s;letter-spacing:.3px}
+    .btn:hover{background:#d4e840}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn-ghost:hover{border-color:var(--accent)}
+    .btn-sm{font-size:12px;padding:7px 14px}
+    .btn-full{width:100%}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:14px}
+    .card-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:14px}
+
+    /* STATS GRID */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px}
+    .player-stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+    .player-stat-card.loading{opacity:.5}
+    .psn{font-size:14px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+    .pst{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px}
+    .stat-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .stat-chip{font-family:'DM Mono',monospace;font-size:11px;padding:3px 8px;border-radius:4px;background:var(--surface);border:1px solid var(--border)}
+    .stat-chip span{color:var(--muted);margin-right:2px}
+    .stat-chip strong{color:var(--text)}
+    .games-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(232,255,71,.1);color:var(--accent);border:1px solid rgba(232,255,71,.2)}
+    .games-badge.low{background:rgba(248,113,113,.1);color:var(--loss);border-color:rgba(248,113,113,.2)}
+    .status-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-family:'DM Mono',monospace}
+    .status-badge.gtd{background:rgba(251,191,36,.1);color:var(--battle);border:1px solid rgba(251,191,36,.2)}
+    .status-badge.out{background:rgba(248,113,113,.1);color:var(--loss);border:1px solid rgba(248,113,113,.2)}
+
+    /* UPLOAD */
+    .upload-zone{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:10px;position:relative;overflow:hidden}
+    .upload-zone:hover{border-color:var(--accent);background:rgba(232,255,71,.02)}
+    .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .upload-preview{display:flex;align-items:flex-start;gap:10px;padding:10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);margin-bottom:10px}
+    .upload-preview img{width:72px;height:50px;object-fit:cover;border-radius:4px;flex-shrink:0}
+    .divider{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .divider-line{flex:1;height:1px;background:var(--border)}
+    .divider-text{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace}
+
+    /* CHAT */
+    .chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 57px)}
+    .chat-messages{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+    .chat-input-wrap{padding:14px 24px;border-top:1px solid var(--border);background:var(--surface)}
+    .chat-input-row{display:flex;gap:8px}
+    .chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:10px 14px;outline:none;resize:none;min-height:44px;max-height:120px;margin-bottom:0;transition:border-color .15s}
+    .chat-input:focus{border-color:var(--accent)}
+    .msg{max-width:82%;display:flex;flex-direction:column;gap:3px}
+    .msg.user{align-self:flex-end;align-items:flex-end}
+    .msg.ai{align-self:flex-start;align-items:flex-start}
+    .msg-bubble{padding:11px 15px;border-radius:12px;font-size:13px;line-height:1.7;white-space:pre-wrap}
+    .msg.user .msg-bubble{background:var(--accent);color:#000;font-weight:500;border-bottom-right-radius:4px}
+    .msg.ai .msg-bubble{background:var(--surface);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
+    .msg-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+    .quick-prompts{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+    .quick-btn{background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--muted);font-size:11px;padding:5px 12px;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+    .quick-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .typing-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin:0 2px;animation:blink 1.2s infinite}
+    .typing-dots span:nth-child(2){animation-delay:.2s}
+    .typing-dots span:nth-child(3){animation-delay:.4s}
+    @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .empty-state{text-align:center;padding:50px 20px;color:var(--muted)}
+    .empty-state .big{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--border)}
+    .empty-state p{font-size:13px;margin-top:8px;line-height:1.6}
+    .info-box{background:rgba(232,255,71,.04);border:1px solid rgba(232,255,71,.15);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6}
+    .info-box strong{color:var(--accent)}
+    .warn-box{background:rgba(255,107,53,.04);border:1px solid rgba(255,107,53,.2);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6}
+    .warn-box strong{color:var(--accent2)}
+    .section-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;margin-top:20px}
+    .section-label:first-child{margin-top:0}
+    .punt-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;background:var(--surface2);color:var(--muted)}
+    .punt-btn.active{border-color:var(--accent);background:rgba(232,255,71,.1);color:var(--accent)}
+    @media(max-width:768px){.sidebar{width:56px;min-width:56px}.logo-title,.logo-sub,.nav-btn span{display:none}.nav-btn{justify-content:center;padding:12px}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+const CATS=["PTS","REB","AST","STL","BLK","3PM","FG%","FT%","TO"];
+const NAV=[
+  {id:"brief",    icon:"☀️",label:"Daily Brief"},
+  {id:"matchup",  icon:"⚔️",label:"Matchup"},
+  {id:"waiver",   icon:"➕",label:"Waiver Wire"},
+  {id:"trades",   icon:"🔄",label:"Trade Ideas"},
+  {id:"chat",     icon:"💬",label:"GM Chat"},
+  {id:"settings", icon:"⚙️",label:"Settings"},
+];
+const SEASON=2024; // current NBA season key for BallDontLie
+
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function lv(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+
+// ── API HELPERS ───────────────────────────────────────────────────────────────
+async function bdlSearchPlayer(name, bdlKey) {
+  const r = await fetch(`https://api.balldontlie.io/v1/players?search=${encodeURIComponent(name)}&per_page=5`,
+    {headers:{Authorization: bdlKey}});
+  const d = await r.json();
+  return d.data?.[0] || null;
+}
+
+async function bdlSeasonAvg(playerId, bdlKey) {
+  const r = await fetch(`https://api.balldontlie.io/v1/season_averages?season=${SEASON}&player_ids[]=${playerId}`,
+    {headers:{Authorization: bdlKey}});
+  const d = await r.json();
+  return d.data?.[0] || null;
+}
+
+async function bdlRecentGames(playerId, bdlKey) {
+  // Last 14 days of games
+  const since = new Date(Date.now() - 14*24*60*60*1000).toISOString().split('T')[0];
+  const r = await fetch(`https://api.balldontlie.io/v1/stats?player_ids[]=${playerId}&start_date=${since}&per_page=15`,
+    {headers:{Authorization: bdlKey}});
+  const d = await r.json();
+  return d.data || [];
+}
+
+async function bdlUpcomingGames(teamId, bdlKey) {
+  const today = new Date().toISOString().split('T')[0];
+  const weekEnd = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
+  const r = await fetch(`https://api.balldontlie.io/v1/games?team_ids[]=${teamId}&start_date=${today}&end_date=${weekEnd}&per_page=10`,
+    {headers:{Authorization: bdlKey}});
+  const d = await r.json();
+  return d.data || [];
+}
+
+function calcL14Avg(games) {
+  if(!games.length) return null;
+  const avg = f => (games.reduce((s,g)=>s+(g[f]||0),0)/games.length).toFixed(1);
+  const fgm = games.reduce((s,g)=>s+(g.fgm||0),0);
+  const fga = games.reduce((s,g)=>s+(g.fga||0),0);
+  const ftm = games.reduce((s,g)=>s+(g.ftm||0),0);
+  const fta = games.reduce((s,g)=>s+(g.fta||0),0);
+  return {
+    pts:avg('pts'), reb:avg('reb'), ast:avg('ast'),
+    stl:avg('stl'), blk:avg('blk'), fg3m:avg('fg3m'),
+    fg_pct: fga>0?(fgm/fga*100).toFixed(1):'—',
+    ft_pct: fta>0?(ftm/fta*100).toFixed(1):'—',
+    to:avg('turnover'), gp:games.length
+  };
+}
+
+async function fetchPlayerData(name, bdlKey) {
+  try {
+    const player = await bdlSearchPlayer(name, bdlKey);
+    if(!player) return {name, error:'Not found'};
+    const [season, recent, upcoming] = await Promise.all([
+      bdlSeasonAvg(player.id, bdlKey),
+      bdlRecentGames(player.id, bdlKey),
+      bdlUpcomingGames(player.team_id, bdlKey)
+    ]);
+    const l14 = calcL14Avg(recent);
+    return {
+      name, playerId:player.id, team:player.team?.abbreviation,
+      pos:player.position, season, l14,
+      gamesLeft: upcoming.length,
+      upcomingGames: upcoming.map(g=>{
+        const isHome = g.home_team_id===player.team_id;
+        return (isHome?'vs ':'@ ')+(isHome?g.visitor_team?.abbreviation:g.home_team?.abbreviation);
+      })
+    };
+  } catch(e) {
+    return {name, error:e.message};
+  }
+}
+
+async function fetchAllPlayers(names, bdlKey) {
+  const list = names.split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+  return Promise.all(list.map(n=>fetchPlayerData(n, bdlKey)));
+}
+
+// ── CLAUDE API ────────────────────────────────────────────────────────────────
+async function callClaude(apiKey, messages, system) {
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-beta":"web-search-2025-03-05"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,system,
+      tools:[{type:"web_search_20250305",name:"web_search"}],messages})
+  });
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error?.message||"API error");
+  return data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
+}
+
+async function compressImage(dataUrl,maxWidth=1200){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,maxWidth/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      resolve(canvas.toDataURL('image/jpeg',0.82));
+    };
+    img.src=dataUrl;
+  });
+}
+
+async function readImageWithClaude(apiKey,base64,mediaType,prompt){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,
+      messages:[{role:"user",content:[
+        {type:"image",source:{type:"base64",media_type:"image/jpeg",data:base64}},
+        {type:"text",text:prompt}
+      ]}]})
+  });
+  const data=await res.json();
+  if(!res.ok){
+    const msg=data.error?.message||JSON.stringify(data);
+    throw new Error(msg);
+  }
+  return data.content[0]?.text||"";
+}
+
+function buildSystem(s, rosterData, oppData, waiverData) {
+  const fmtPlayer = p => {
+    if(!p||p.error) return `${p?.name||'?'} (data unavailable)`;
+    const sa = p.season;
+    const l = p.l14;
+    return `${p.name} (${p.team||'?'}, ${p.pos||'?'}) | Games left this week: ${p.gamesLeft} (${p.upcomingGames?.join(', ')||'none'}) | Season avg: ${sa?`${sa.pts}pts ${sa.reb}reb ${sa.ast}ast ${sa.stl}stl ${sa.blk}blk ${sa.fg3m}3pm ${sa.fg_pct}fg% ${sa.ft_pct}ft% ${sa.turnover||'?'}to`:'N/A'} | L14 avg: ${l?`${l.pts}pts ${l.reb}reb ${l.ast}ast ${l.stl}stl ${l.blk}blk ${l.fg3m}3pm ${l.fg_pct}fg% ${l.ft_pct}ft% ${l.to}to (${l.gp} games)`:'N/A'}`;
+  };
+
+  const myRosterStr = rosterData?.length ? rosterData.map(fmtPlayer).join('\n') : s.roster||'not provided';
+  const oppStr = oppData?.length ? oppData.map(fmtPlayer).join('\n') : [s.opponent,s.oppRoster].filter(Boolean).join(', ')||'not provided';
+  const waiverStr = waiverData?.length ? waiverData.map(fmtPlayer).join('\n') : s.waiver||'not provided';
+
+  return `You are an elite NBA fantasy basketball GM advisor. Direct, analytical, data-driven.
+
+H2H 9-CAT LEAGUE | Team: ${s.teamName||'not set'} | Punt: ${s.punt?.join(' + ')||'not set'}
+
+WINNING FORMULA: Top 3 in 6+ cats → most consistent winners. Top 5 in 7 cats. Punt 1-2 cats completely. Never half-punt.
+
+MY ROSTER (with real stats from BallDontLie API + games left this week):
+${myRosterStr}
+
+OPPONENT THIS WEEK:
+${oppStr}
+
+AVAILABLE WAIVER PLAYERS (with real stats):
+${waiverStr}
+
+RULES:
+- Use the actual stats and games-remaining above for all projections
+- Project week totals as: L14 avg × games remaining this week
+- Only recommend drops if a player is genuinely replaceable (bench filler, injured long-term)
+- Trade ideas must show explicit category rank impact
+- Always search for injury news and role changes — these override stats`;
+}
+
+// ── SCREENSHOT UPLOAD ─────────────────────────────────────────────────────────
+function ScreenshotUpload({label,hint,prompt,value,apiKey,onChange}){
+  const [preview,setPreview]=useState(null);
+  const [reading,setReading]=useState(false);
+  const [error,setError]=useState("");
+
+  async function handleFile(file){
+    if(!file||!file.type.startsWith("image/")){setError("Please upload an image file (PNG, JPG, etc).");return;}
+    if(!apiKey){setError("Enter your Anthropic API key first (step 01 in setup).");return;}
+    setError("");
+    const reader=new FileReader();
+    reader.onload=async(e)=>{
+      const rawDataUrl=e.target.result;
+      setPreview({url:rawDataUrl,name:file.name});
+      setReading(true);
+      try{
+        // Compress image to reduce size and ensure JPEG format
+        const compressed=await compressImage(rawDataUrl,1200);
+        const base64=compressed.split(",")[1];
+        const result=await readImageWithClaude(apiKey,base64,"image/jpeg",prompt);
+        onChange(result);
+      }catch(err){
+        console.error("Screenshot read error:",err);
+        setError("Error: "+err.message+". Check your API key is correct and try again.");
+      }
+      setReading(false);
+    };
+    reader.onerror=()=>setError("Failed to read the file. Try a different image.");
+    reader.readAsDataURL(file);
+  }
+
+  return(
+    <div style={{marginBottom:14}}>
+      <label style={{marginBottom:6,display:"block",fontWeight:600,fontSize:13}}>{label}</label>
+      {hint&&<p className="hint" style={{marginTop:0,marginBottom:8}}>{hint}</p>}
+      {preview?(
+        <div className="upload-preview">
+          <img src={preview.url} alt="ss"/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:4}}>{preview.name}</div>
+            {reading
+              ?<div style={{fontSize:11,color:"var(--muted)",display:"flex",alignItems:"center",gap:6}}><span className="spinner" style={{width:11,height:11,borderWidth:2}}/> Reading...</div>
+              :value?<div style={{fontSize:11,color:"var(--win)"}}>✅ Extracted</div>:null}
+          </div>
+          <button className="btn-ghost btn btn-sm" onClick={()=>{setPreview(null);onChange("");}}>✕</button>
+        </div>
+      ):(
+        <div className="upload-zone">
+          <input type="file" accept="image/*" onChange={e=>handleFile(e.target.files[0])}/>
+          <div style={{fontSize:22,marginBottom:6}}>📸</div>
+          <div style={{fontSize:12,color:"var(--muted)"}}><strong style={{color:"var(--accent)"}}>Click or drag</strong> a Yahoo screenshot</div>
+        </div>
+      )}
+      {error&&<div style={{fontSize:11,color:"var(--loss)",marginTop:4}}>{error}</div>}
+      <div className="divider"><div className="divider-line"/><span className="divider-text">or type manually</span><div className="divider-line"/></div>
+      <textarea rows={2} placeholder="Paste player names..." value={value} onChange={e=>onChange(e.target.value)}/>
+    </div>
+  );
+}
+
+// ── PLAYER STAT CARD ──────────────────────────────────────────────────────────
+function PlayerStatCard({p}){
+  if(!p) return null;
+  const gl=p.gamesLeft||0;
+  return(
+    <div className={`player-stat-card ${p.loading?'loading':''}`}>
+      <div className="psn">
+        {p.name}
+        {p.gamesLeft!==undefined&&<span className={`games-badge ${gl<=1?'low':''}`}>{gl}G left</span>}
+        {p.status&&<span className={`status-badge ${p.status==='GTD'?'gtd':'out'}`}>{p.status}</span>}
+      </div>
+      <div className="pst">{p.team||'—'} · {p.pos||'—'}{p.upcomingGames?.length?` · ${p.upcomingGames.join(', ')}`:''}</div>
+      {p.error?<div style={{fontSize:11,color:"var(--loss)"}}>{p.error}</div>:(
+        <>
+          {p.l14&&(
+            <div>
+              <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:4}}>L14 AVG</div>
+              <div className="stat-row">
+                {[['PTS',p.l14.pts],['REB',p.l14.reb],['AST',p.l14.ast],['STL',p.l14.stl],['BLK',p.l14.blk],['3PM',p.l14.fg3m],['FG%',p.l14.fg_pct],['FT%',p.l14.ft_pct],['TO',p.l14.to]].map(([k,v])=>(
+                  <div key={k} className="stat-chip"><span>{k}</span><strong>{v}</strong></div>
+                ))}
+              </div>
+            </div>
+          )}
+          {p.season&&(
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:4}}>SEASON AVG</div>
+              <div className="stat-row">
+                {[['PTS',p.season.pts],['REB',p.season.reb],['AST',p.season.ast],['STL',p.season.stl],['BLK',p.season.blk],['3PM',p.season.fg3m],['FG%',p.season.fg_pct?p.season.fg_pct?.toFixed(1):'—'],['FT%',p.season.ft_pct?p.season.ft_pct?.toFixed(1):'—'],['TO',p.season.turnover]].map(([k,v])=>(
+                  <div key={k} className="stat-chip"><span>{k}</span><strong>{v??'—'}</strong></div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── SETUP ─────────────────────────────────────────────────────────────────────
+function SetupScreen({onSave}){
+  const [form,setForm]=useState({apiKey:"",bdlKey:"",teamName:"",punt:[],roster:"",opponent:"",oppRoster:"",waiver:""});
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const togglePunt=cat=>setForm(f=>{
+    const p=f.punt.includes(cat)?f.punt.filter(c=>c!==cat):f.punt.length<2?[...f.punt,cat]:f.punt;
+    return{...f,punt:p};
+  });
+
+  return(
+    <div className="setup-screen">
+      <div className="setup-header">NBA GM<br/>WAR ROOM</div>
+      <p className="setup-sub">Your daily fantasy command center. Screenshots replace manual data entry.</p>
+
+      <div className="setup-card">
+        <span className="setup-card-num">01</span>
+        <div className="setup-card-title">AI Brain (Anthropic)</div>
+        <label>Anthropic API Key — powers all analysis and chat</label>
+        <input type="password" placeholder="sk-ant-..." value={form.apiKey} onChange={e=>set("apiKey",e.target.value)}/>
+        <p className="hint">Free to start → console.anthropic.com → API Keys → Create Key</p>
+      </div>
+
+      <div className="setup-card">
+        <span className="setup-card-num">02</span>
+        <div className="setup-card-title">Real NBA Stats (BallDontLie)</div>
+        <label>BallDontLie API Key — pulls live player stats, schedules, game logs</label>
+        <input type="password" placeholder="your-bdl-key..." value={form.bdlKey} onChange={e=>set("bdlKey",e.target.value)}/>
+        <p className="hint">Free → app.balldontlie.io → sign up → copy your API key</p>
+      </div>
+
+      <div className="setup-card">
+        <span className="setup-card-num">03</span>
+        <div className="setup-card-title">Your Team</div>
+        <label>Team name (optional)</label>
+        <input placeholder="e.g. Laker Boys" value={form.teamName} onChange={e=>set("teamName",e.target.value)}/>
+        <label style={{marginTop:4}}>Punt strategy — pick 1–2 categories to sacrifice</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:10}}>
+          {CATS.map(c=>(
+            <button key={c} className={`punt-btn ${form.punt.includes(c)?'active':''}`} onClick={()=>togglePunt(c)}>{c}</button>
+          ))}
+        </div>
+        <p className="hint">Not sure? Leave blank — the AI will recommend based on your roster.</p>
+      </div>
+
+      <div className="setup-card">
+        <span className="setup-card-num">04</span>
+        <div className="setup-card-title">Yahoo Screenshots</div>
+        <p className="hint" style={{marginBottom:12}}>Take 3 quick screenshots from Yahoo Fantasy each morning. The AI reads them automatically — no typing needed.</p>
+        <ScreenshotUpload
+          label="📋 My Roster"
+          hint="Screenshot your Yahoo roster page"
+          prompt="This is a Yahoo Fantasy Basketball roster page. Extract ONLY the player names as a simple comma-separated list. Nothing else — just the names."
+          value={form.roster} apiKey={form.apiKey} onChange={v=>set("roster",v)}
+        />
+        <ScreenshotUpload
+          label="⚔️ Matchup Page"
+          hint="Screenshot your weekly matchup page — the AI reads the current category scores and both rosters"
+          prompt="This is a Yahoo Fantasy Basketball weekly matchup page. List my team's players and my opponent's players separately. Format: MY TEAM: [names comma separated] | OPPONENT: [names comma separated]. Also note any category scores or win/loss shown if visible."
+          value={form.opponent} apiKey={form.apiKey} onChange={v=>set("opponent",v)}
+        />
+        <ScreenshotUpload
+          label="👤 Opponent's Team (optional but recommended)"
+          hint="Screenshot your opponent's full roster page for deeper analysis of their stats"
+          prompt="This is a Yahoo Fantasy Basketball team roster page. List all player names as a simple comma-separated list only. Nothing else."
+          value={form.oppRoster} apiKey={form.apiKey} onChange={v=>set("oppRoster",v)}
+        />
+        <ScreenshotUpload
+          label="➕ Waiver Wire"
+          hint="Screenshot your waiver wire — AI will know who's actually available in YOUR league"
+          prompt="This is a Yahoo Fantasy Basketball waiver wire page. List all available player names in a comma-separated list. Include their team abbreviation if visible. Format: Player Name (TEAM), ..."
+          value={form.waiver} apiKey={form.apiKey} onChange={v=>set("waiver",v)}
+        />
+      </div>
+
+      <button className="btn btn-full" disabled={!form.apiKey||!form.bdlKey} onClick={()=>onSave(form)}>
+        ENTER THE WAR ROOM →
+      </button>
+      <p className="hint" style={{textAlign:"center",marginTop:8}}>Both API keys required to proceed</p>
+    </div>
+  );
+}
+
+// ── DAILY BRIEF ───────────────────────────────────────────────────────────────
+function DailyBrief({settings,rosterData,oppData,waiverData,loadingStats}){
+  const [brief,setBrief]=useState(lv("brief",""));
+  const [loading,setLoading]=useState(false);
+
+  async function generate(){
+    setLoading(true);
+    try{
+      const sys=buildSystem(settings,rosterData,oppData,waiverData);
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Generate my daily fantasy brief for today (${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}).
+
+Using the real stats already loaded above, give me:
+
+1. CATEGORY OUTLOOK — For each of the 9 cats, project my week total (L14 avg × games remaining) vs opponent's projected total. Label each WIN 🟢 / LOSE 🔴 / BATTLE 🟡. Show the math.
+
+2. WAIVER WIRE ADDS — From the available players listed, recommend top 2-3 adds. For each:
+   - Their games left this week + projected stats
+   - How they flip a battleground category in my favor
+   - Who I should drop to make room (only if that player genuinely has no value)
+   - Clear verdict: ADD ✅ or SKIP ❌
+
+3. MUST-ADD ALERT — Search for any injury news that opens up a new must-add not on my waiver list yet.
+
+4. TRADE AWAY — Which 1-2 players from my roster clash with my punt strategy and should be moved?
+
+Be specific. Show the math. Use the actual stats provided.`}],sys);
+      setBrief(text);sv("brief",text);
+    }catch(e){setBrief("Error: "+e.message);}
+    setLoading(false);
+  }
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"2px"}}>DAILY BRIEF</div>
+          <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
+        </div>
+        <button className="btn" onClick={generate} disabled={loading||loadingStats}>
+          {loadingStats?"Loading stats...":loading?"Analyzing...":"↻ REFRESH"}
+        </button>
+      </div>
+      {loadingStats&&<div className="info-box">⏳ <strong>Fetching real NBA stats</strong> for all your players — this takes ~20 seconds on first load...</div>}
+      {!brief&&!loading&&!loadingStats&&<div className="empty-state"><div className="big">GM</div><p>Click Refresh to get today's analysis.<br/>All stats are loaded from the real NBA API.</p></div>}
+      {loading&&<div className="card" style={{textAlign:"center",padding:36}}><div className="spinner" style={{width:28,height:28,margin:"0 auto 12px"}}/><div style={{color:"var(--muted)",fontSize:12,fontFamily:"'DM Mono',monospace"}}>Running week projections with real stats...</div></div>}
+      {brief&&!loading&&(
+        <div className="card">
+          <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{brief}</div>
+          <div style={{marginTop:14,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Generated {new Date().toLocaleTimeString()} · Stats from BallDontLie API</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MATCHUP ───────────────────────────────────────────────────────────────────
+function MatchupView({settings,rosterData,oppData,loadingStats}){
+  const [analysis,setAnalysis]=useState(lv("matchup",""));
+  const [loading,setLoading]=useState(false);
+
+  async function analyze(){
+    setLoading(true);
+    try{
+      const sys=buildSystem(settings,rosterData,oppData,null);
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Full matchup analysis for this week.
+
+Using the real stats above, project the entire week category-by-category:
+
+For each of the 9 categories:
+- My projected total (L14 avg × my games remaining)
+- Opponent's projected total (L14 avg × their games remaining)
+- Show the math explicitly
+- Verdict: WIN 🟢 / LOSE 🔴 / BATTLE 🟡 (within 5% = battle)
+
+Then:
+- Projected final score (e.g. 6-2-1)
+- Top 3 categories to focus on winning (battlegrounds)
+- Any specific player I should start/bench today to maximize a battleground cat
+- Search for any injury news that could shift projections`}],sys);
+      setAnalysis(text);sv("matchup",text);
+    }catch(e){setAnalysis("Error: "+e.message);}
+    setLoading(false);
+  }
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"2px"}}>MATCHUP ANALYSIS</div>
+          <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Real stats · Week projection</div>
+        </div>
+        <button className="btn" onClick={analyze} disabled={loading||loadingStats}>{loading?"Analyzing...":"⚔️ RUN"}</button>
+      </div>
+
+      {rosterData?.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div className="section-label">MY ROSTER — LIVE STATS</div>
+          <div className="stats-grid">
+            {rosterData.map((p,i)=><PlayerStatCard key={i} p={p}/>)}
+          </div>
+          {oppData?.length>0&&<>
+            <div className="section-label">OPPONENT</div>
+            <div className="stats-grid">
+              {oppData.map((p,i)=><PlayerStatCard key={i} p={p}/>)}
+            </div>
+          </>}
+        </div>
+      )}
+
+      {!analysis&&!loading&&<div className="empty-state"><div className="big">⚔️</div><p>Run analysis to see category-by-category projections<br/>with real stats and games remaining.</p></div>}
+      {loading&&<div className="card" style={{textAlign:"center",padding:36}}><div className="spinner" style={{width:28,height:28,margin:"0 auto 12px"}}/><div style={{color:"var(--muted)",fontSize:12}}>Projecting all 9 categories with real data...</div></div>}
+      {analysis&&!loading&&<div className="card"><div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{analysis}</div></div>}
+    </div>
+  );
+}
+
+// ── WAIVER WIRE ───────────────────────────────────────────────────────────────
+function WaiverWire({settings,waiverData,loadingStats,rosterData,oppData}){
+  const [extra,setExtra]=useState("");
+  const [extraData,setExtraData]=useState([]);
+  const [loadingExtra,setLoadingExtra]=useState(false);
+  const [analysis,setAnalysis]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  async function lookupExtra(){
+    if(!extra.trim()) return;
+    setLoadingExtra(true);
+    const data=await fetchAllPlayers(extra,settings.bdlKey);
+    setExtraData(data);
+    setLoadingExtra(false);
+  }
+
+  async function analyze(){
+    setLoading(true);
+    try{
+      const allWaiver=[...(waiverData||[]),...extraData];
+      const sys=buildSystem(settings,rosterData,oppData,allWaiver.length?allWaiver:null);
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Waiver wire analysis for my team.
+
+Using the real stats loaded above for available waiver players:
+
+For each available player, analyze:
+1. Games left this week + projected week totals (L14 × games)
+2. Fit with my punt strategy (${settings.punt?.join(' + ')||'TBD'})
+3. Which specific battleground category they help me flip vs my opponent
+4. Who I'd need to drop (justified only if that player is genuinely cuttable)
+5. Verdict: ADD ✅ / SKIP ❌ / SITUATIONAL ⚡
+
+Also search for:
+- Any players surging in minutes due to injuries
+- Fantasy analyst buzz on X/Twitter for any of these players
+
+Rank by best fit for MY specific team's needs this week.`}],sys);
+      setAnalysis(text);
+    }catch(e){setAnalysis("Error: "+e.message);}
+    setLoading(false);
+  }
+
+  return(
+    <div>
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"2px",marginBottom:4}}>WAIVER WIRE</div>
+      <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:16}}>Filtered for your punt strategy · Real stats loaded</div>
+
+      {!settings.waiver&&<div className="warn-box">⚠️ <strong>No waiver screenshot uploaded.</strong> Go to Settings → upload your Yahoo waiver wire screenshot so the AI knows which players are actually available in your league.</div>}
+
+      {waiverData?.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div className="section-label">AVAILABLE PLAYERS — FROM YOUR SCREENSHOT</div>
+          <div className="stats-grid">
+            {waiverData.map((p,i)=><PlayerStatCard key={i} p={p}/>)}
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-sub">Add specific players to analyze</div>
+        <textarea rows={2} placeholder="e.g. Keegan Murray, Brook Lopez..." value={extra} onChange={e=>setExtra(e.target.value)}/>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={lookupExtra} disabled={loadingExtra||!extra.trim()}>{loadingExtra?"Loading...":"Load Stats"}</button>
+          <button className="btn" onClick={analyze} disabled={loading||loadingStats}>{loading?"Analyzing...":"ANALYZE WIRE"}</button>
+        </div>
+      </div>
+
+      {extraData.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div className="section-label">EXTRA PLAYERS</div>
+          <div className="stats-grid">{extraData.map((p,i)=><PlayerStatCard key={i} p={p}/>)}</div>
+        </div>
+      )}
+
+      {loading&&<div className="card" style={{textAlign:"center",padding:36}}><div className="spinner" style={{width:28,height:28,margin:"0 auto 12px"}}/><div style={{color:"var(--muted)",fontSize:12}}>Searching stats and analyst picks...</div></div>}
+      {analysis&&!loading&&<div className="card"><div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{analysis}</div></div>}
+    </div>
+  );
+}
+
+// ── TRADE IDEAS ───────────────────────────────────────────────────────────────
+function TradeIdeas({settings,rosterData}){
+  const [ideas,setIdeas]=useState(lv("trades",""));
+  const [loading,setLoading]=useState(false);
+
+  async function generate(){
+    setLoading(true);
+    try{
+      const sys=buildSystem(settings,rosterData,null,null);
+      const text=await callClaude(settings.apiKey,[{role:"user",content:`Generate trade ideas based on my punt strategy and real roster stats.
+
+My punt: ${settings.punt?.join(' + ')||'TBD'}
+
+Using the real stats already loaded for my roster:
+1. Identify which players clash with my punt (they excel in categories I'm punting)
+2. Identify which categories I need to improve to hit Top 3
+3. Search for players available in H2H leagues that would fit my build
+
+For each trade idea:
+- Who I'm sending: player name + why they don't fit my punt (show stat conflict)
+- What I'm targeting: specific player type or names + how they improve my target cats
+- Category rank impact: e.g. "lose STL rank 10→12, gain BLK rank 8→3, net +1 cat win/week"
+- Sample offer: fair trade proposal
+
+Give 3-4 ideas ranked by priority. End with: my 3 untouchables and why.`}],sys);
+      setIdeas(text);sv("trades",text);
+    }catch(e){setIdeas("Error: "+e.message);}
+    setLoading(false);
+  }
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"26px",letterSpacing:"2px"}}>TRADE IDEAS</div>
+          <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Based on your stats + punt strategy</div>
+        </div>
+        <button className="btn" onClick={generate} disabled={loading}>{loading?"Generating...":"🔄 GENERATE"}</button>
+      </div>
+      <div className="card" style={{borderLeft:"3px solid var(--accent)",marginBottom:14}}>
+        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)",marginBottom:5}}>THE FORMULA</div>
+        <div style={{fontSize:12,lineHeight:1.7}}>Win = <strong>Top 3 in 6+ cats</strong> · <strong>Top 5 in 7 cats</strong> · Punt <strong>1–2 completely</strong></div>
+      </div>
+      {rosterData?.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div className="section-label">MY ROSTER</div>
+          <div className="stats-grid">{rosterData.map((p,i)=><PlayerStatCard key={i} p={p}/>)}</div>
+        </div>
+      )}
+      {!ideas&&!loading&&<div className="empty-state"><div className="big">🔄</div><p>Generate trade ideas to see who to flip<br/>and what to target back.</p></div>}
+      {loading&&<div className="card" style={{textAlign:"center",padding:36}}><div className="spinner" style={{width:28,height:28,margin:"0 auto 12px"}}/><div style={{color:"var(--muted)",fontSize:12}}>Analyzing trade value with real stats...</div></div>}
+      {ideas&&!loading&&<div className="card"><div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{ideas}</div></div>}
+    </div>
+  );
+}
+
+// ── CHAT ──────────────────────────────────────────────────────────────────────
+function Chat({settings,rosterData,oppData,waiverData}){
+  const [messages,setMessages]=useState(lv("chat_msgs",[]));
+  const [input,setInput]=useState("");
+  const [loading,setLoading]=useState(false);
+  const bottomRef=useRef();
+  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"})},[messages]);
+
+  const QUICK=["Should I punt FT% or TO?","Analyze my category strengths and weaknesses","Who's my most tradeable player and why?","Which waiver player fits my punt best?","How do I win more categories this week?"];
+
+  async function send(text){
+    const msg=text||input.trim();
+    if(!msg) return;
+    setInput("");
+    const newMsgs=[...messages,{role:"user",content:msg}];
+    setMessages(newMsgs);sv("chat_msgs",newMsgs);
+    setLoading(true);
+    try{
+      const sys=buildSystem(settings,rosterData,oppData,waiverData);
+      const reply=await callClaude(settings.apiKey,newMsgs.map(m=>({role:m.role,content:m.content})),sys);
+      const final=[...newMsgs,{role:"assistant",content:reply}];
+      setMessages(final);sv("chat_msgs",final);
+    }catch(e){
+      setMessages(m=>[...m,{role:"assistant",content:"Error: "+e.message}]);
+    }
+    setLoading(false);
+  }
+
+  function handleKey(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}
+
+  return(
+    <div className="chat-wrap">
+      <div className="chat-messages">
+        {messages.length===0&&<div style={{textAlign:"center",paddingTop:40}}><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:52,color:"var(--border)"}}>GM CHAT</div><div style={{color:"var(--muted)",fontSize:12,marginTop:8}}>Ask anything about your team, trades, or strategy.<br/>All responses use your real stats.</div></div>}
+        {messages.map((m,i)=>(
+          <div key={i} className={`msg ${m.role==="user"?"user":"ai"}`}>
+            <div className="msg-label">{m.role==="user"?"YOU":"GM AI"}</div>
+            <div className="msg-bubble">{m.content}</div>
+          </div>
+        ))}
+        {loading&&<div className="msg ai"><div className="msg-label">GM AI</div><div className="msg-bubble"><div className="typing-dots"><span/><span/><span/></div></div></div>}
+        <div ref={bottomRef}/>
+      </div>
+      <div className="chat-input-wrap">
+        {messages.length===0&&<div className="quick-prompts">{QUICK.map(q=><button key={q} className="quick-btn" onClick={()=>send(q)}>{q}</button>)}</div>}
+        <div className="chat-input-row">
+          <textarea className="chat-input" rows={1} placeholder="Ask your GM anything..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKey}/>
+          <button className="btn" onClick={()=>send()} disabled={loading||!input.trim()}>SEND</button>
+        </div>
+        {messages.length>0&&<button className="btn-ghost btn btn-sm" style={{marginTop:8}} onClick={()=>{setMessages([]);sv("chat_msgs",[]);}}>Clear chat</button>}
+      </div>
+    </div>
+  );
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+function Settings({settings,onSave}){
+  const [form,setForm]=useState(settings);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const togglePunt=cat=>setForm(f=>{
+    const p=f.punt.includes(cat)?f.punt.filter(c=>c!==cat):f.punt.length<2?[...f.punt,cat]:f.punt;
+    return{...f,punt:p};
+  });
+
+  return(
+    <div style={{maxWidth:560}}>
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,letterSpacing:2,marginBottom:16}}>SETTINGS</div>
+      <div className="card">
+        <div className="setup-card-title">API Keys</div>
+        <label>Anthropic Key</label><input type="password" value={form.apiKey} onChange={e=>set("apiKey",e.target.value)}/>
+        <label>BallDontLie Key</label><input type="password" value={form.bdlKey} onChange={e=>set("bdlKey",e.target.value)}/>
+        <label>Team Name</label><input value={form.teamName} onChange={e=>set("teamName",e.target.value)}/>
+      </div>
+      <div className="card">
+        <div className="setup-card-title">Punt Strategy</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:8}}>
+          {CATS.map(c=><button key={c} className={`punt-btn ${form.punt.includes(c)?'active':''}`} onClick={()=>togglePunt(c)}>{c}</button>)}
+        </div>
+      </div>
+      <div className="card">
+        <div className="setup-card-title">Update Screenshots</div>
+        <ScreenshotUpload label="My Roster" hint="Re-upload after any roster changes" prompt="List all player names on this Yahoo Fantasy Basketball roster as a comma-separated list only." value={form.roster} apiKey={form.apiKey} onChange={v=>set("roster",v)}/>
+        <ScreenshotUpload label="Matchup Page" hint="Update each week" prompt="This is a Yahoo Fantasy Basketball matchup. MY TEAM: [comma-separated players] | OPPONENT: [comma-separated players]" value={form.opponent} apiKey={form.apiKey} onChange={v=>set("opponent",v)}/>
+        <ScreenshotUpload label="Opponent's Roster (optional)" hint="Screenshot their full team page" prompt="This is a Yahoo Fantasy Basketball team roster. List all player names as a comma-separated list only." value={form.oppRoster} apiKey={form.apiKey} onChange={v=>set("oppRoster",v)}/>
+        <ScreenshotUpload label="Waiver Wire" hint="Upload fresh each morning" prompt="List all available player names on this Yahoo Fantasy Basketball waiver wire as: Player Name (TEAM), ..." value={form.waiver} apiKey={form.apiKey} onChange={v=>set("waiver",v)}/>
+      </div>
+      <button className="btn" onClick={()=>onSave(form)}>SAVE</button>
+      <button className="btn-ghost btn" style={{marginLeft:8}} onClick={()=>{if(confirm("Reset?")){localStorage.clear();window.location.reload();}}}>Reset App</button>
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App(){
+  const [settings,setSettings]=useState(lv("settings",null));
+  const [tab,setTab]=useState("brief");
+  const [rosterData,setRosterData]=useState([]);
+  const [oppData,setOppData]=useState([]);
+  const [waiverData,setWaiverData]=useState([]);
+  const [loadingStats,setLoadingStats]=useState(false);
+
+  function extractNames(text, prefix){
+    if(!text) return "";
+    if(prefix){
+      const match=text.match(new RegExp(prefix+':\\s*([^|]+)','i'));
+      return match?match[1].trim():text;
+    }
+    return text;
+  }
+
+  async function loadAllStats(s){
+    if(!s?.bdlKey) return;
+    setLoadingStats(true);
+    try{
+      const myNames=extractNames(s.roster);
+      // Merge matchup page opponent names + direct opponent roster screenshot
+      const oppFromMatchup=extractNames(s.opponent,"OPPONENT");
+      const oppFromRoster=s.oppRoster||"";
+      const oppNames=[oppFromMatchup,oppFromRoster].filter(Boolean).join(", ");
+      const waiverNames=extractNames(s.waiver);
+      const [my,opp,waiver]=await Promise.all([
+        myNames?fetchAllPlayers(myNames,s.bdlKey):Promise.resolve([]),
+        oppNames?fetchAllPlayers(oppNames,s.bdlKey):Promise.resolve([]),
+        waiverNames?fetchAllPlayers(waiverNames,s.bdlKey):Promise.resolve([]),
+      ]);
+      setRosterData(my);
+      setOppData(opp);
+      setWaiverData(waiver);
+    }catch(e){console.error(e);}
+    setLoadingStats(false);
+  }
+
+  function handleSave(s){sv("settings",s);setSettings(s);loadAllStats(s);}
+
+  useEffect(()=>{if(settings) loadAllStats(settings);},[]);
+
+  if(!settings) return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",overflowY:"auto"}}>
+      <SetupScreen onSave={handleSave}/>
+    </div>
+  );
+
+  return(
+    <div className="app">
+      <aside className="sidebar">
+        <div className="logo">
+          <div className="logo-title">FANTASY<br/>GM</div>
+          <div className="logo-sub">War Room</div>
+        </div>
+        <nav className="nav">
+          {NAV.map(n=>(
+            <button key={n.id} className={`nav-btn ${tab===n.id?"active":""}`} onClick={()=>setTab(n.id)}>
+              <span className="nav-icon">{n.icon}</span><span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)",display:"flex",alignItems:"center",gap:6}}>
+            <span className={`dot ${settings.apiKey&&settings.bdlKey?"":"off"}`}/>
+            <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{settings.teamName||"War Room"}</span>
+          </div>
+          {settings.punt?.length>0&&<div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:4}}>PUNT: {settings.punt.join(" + ")}</div>}
+          {loadingStats&&<div style={{fontSize:10,color:"var(--battle)",fontFamily:"'DM Mono',monospace",marginTop:4}}>⏳ Loading stats...</div>}
+        </div>
+      </aside>
+      <main className="main">
+        {tab!=="chat"&&(
+          <div className="topbar">
+            <div className="topbar-title">{NAV.find(n=>n.id===tab)?.label}</div>
+            <div className="topbar-sub">H2H 9-Cat {settings.punt?.length?`· Punt ${settings.punt.join('+')}`:''}</div>
+          </div>
+        )}
+        {tab==="brief"   &&<div className="content"><DailyBrief settings={settings} rosterData={rosterData} oppData={oppData} waiverData={waiverData} loadingStats={loadingStats}/></div>}
+        {tab==="matchup" &&<div className="content"><MatchupView settings={settings} rosterData={rosterData} oppData={oppData} loadingStats={loadingStats}/></div>}
+        {tab==="waiver"  &&<div className="content"><WaiverWire settings={settings} waiverData={waiverData} loadingStats={loadingStats} rosterData={rosterData} oppData={oppData}/></div>}
+        {tab==="trades"  &&<div className="content"><TradeIdeas settings={settings} rosterData={rosterData}/></div>}
+        {tab==="chat"    &&<Chat settings={settings} rosterData={rosterData} oppData={oppData} waiverData={waiverData}/>}
+        {tab==="settings"&&<div className="content"><Settings settings={settings} onSave={handleSave}/></div>}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
